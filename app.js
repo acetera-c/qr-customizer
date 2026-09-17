@@ -30,6 +30,12 @@ const ctx = canvas.getContext("2d");
 const CANVAS_SIZE = canvas.width; // square canvas
 const QUIET_ZONE_MODULES = 3;
 
+// Embedded rather than referenced by path so that exported SVGs stay
+// self-contained; a relative URL would export as a broken external link.
+// Source file kept alongside as tesla-logo.svg.
+const DEFAULT_LOGO_DATA_URL =
+  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIzMCAzMCAxMDAgMTAwIj48ZyBmaWxsPSIjMDAwMDAwIj48cGF0aCBkPSJtODAgMTI5LjggMTQtNzguN2MxMy4zIDAgMTcuNSAxLjUgMTguMSA3LjQgMCAwIDguOS0zLjMgMTMuNS0xMC4xLTE3LjYtOC4xLTM1LjMtOC41LTM1LjMtOC41TDgwIDUyLjUgNjkuNyAzOS45cy0xNy43LjQtMzUuMyA4LjVjNC41IDYuOCAxMy41IDEwLjEgMTMuNSAxMC4xLjYtNiA0LjgtNy40IDE4LjEtNy40eiIvPjxwYXRoIGQ9Ik04MCAzNi4zYzE0LjItLjEgMzAuNSAyLjIgNDcuMiA5LjUgMi4yLTQgMi44LTUuOCAyLjgtNS44LTE4LjItNy4zLTM1LjMtOS43LTUwLTkuOC0xNC43LjEtMzEuOCAyLjUtNTAgOS44IDAgMCAuOCAyLjIgMi44IDUuOCAxNi43LTcuMyAzMy05LjYgNDcuMi05LjUiLz48L2c+PC9zdmc+";
+
 const state = {
   text: "https://www.tesla.com/",
   fgColor: "#000000",
@@ -358,9 +364,22 @@ function rgbToHex(r, g, b) {
 try {
   wireUpUI();
   render();
+  loadDefaultLogo();
 } catch (err) {
   showFatalError("Error setting up the QR customizer UI: " + err.message);
   console.error(err);
+}
+
+function loadDefaultLogo() {
+  const img = new Image();
+  img.onload = () => {
+    // Skip if the user already picked their own logo while this was loading.
+    if (state.logoImage) return;
+    state.logoImage = img;
+    document.getElementById("logoRemoveBtn").hidden = false;
+    render();
+  };
+  img.src = DEFAULT_LOGO_DATA_URL;
 }
 
 function wireUpUI() {
