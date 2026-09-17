@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QR Customizer</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <div id="errorBanner" class="error-banner" hidden></div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">◱</span>
+        <span>QR Customizer</span>
+      </div>
+      <button id="downloadBtn" class="btn btn-primary">Download PNG</button>
+    </header>
+
+    <main class="layout">
+      <section class="preview-pane">
+        <div class="preview-card">
+          <div class="qr-frame" id="qrFrame">
+            <canvas id="qrCanvas" width="600" height="600"></canvas>
+          </div>
+        </div>
+        <div class="content-field">
+          <label for="qrText">QR content (URL or text)</label>
+          <input id="qrText" type="text" value="https://cursor.com" placeholder="Enter a URL or text" />
+        </div>
+      </section>
+
+      <section class="controls-pane">
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="color">
+            <span class="tab-icon dot-icon" style="background:#fff"></span>
+            <span>Color</span>
+          </button>
+          <button class="tab" data-tab="pixels">
+            <span class="tab-icon grid-icon">▦</span>
+            <span>Pixels</span>
+          </button>
+          <button class="tab" data-tab="pupils">
+            <span class="tab-icon pupil-icon">◻</span>
+            <span>Pupils</span>
+          </button>
+          <button class="tab" data-tab="logo">
+            <span class="tab-icon logo-icon">▧</span>
+            <span>Center</span>
+          </button>
+        </div>
+
+        <div class="panel active" data-panel="color">
+          <div class="hue-slider-row">
+            <div class="swatch-toggle active" data-color="#000000" title="Black"></div>
+            <input id="hueSlider" type="range" min="0" max="360" value="0" class="hue-slider" />
+            <div class="swatch-toggle" data-color="#4b4b4b" title="Dark gray"></div>
+          </div>
+          <div class="field-row">
+            <label>Foreground</label>
+            <input id="fgColor" type="color" value="#000000" />
+          </div>
+          <div class="field-row">
+            <label>Background</label>
+            <input id="bgColor" type="color" value="#ffffff" />
+          </div>
+        </div>
+
+        <div class="panel" data-panel="pixels">
+          <label class="slider-label">Corner rounding <span id="pixelValue">0%</span></label>
+          <div class="slider-row">
+            <span class="edge-icon sq">■</span>
+            <input id="pixelSlider" type="range" min="0" max="100" value="0" />
+            <span class="edge-icon rd">●</span>
+          </div>
+          <p class="hint">Controls how rounded each QR data module is, from sharp squares to soft dots.</p>
+        </div>
+
+        <div class="panel" data-panel="pupils">
+          <label class="slider-label">Eye frame radius <span id="eyeValue">0%</span></label>
+          <div class="slider-row">
+            <span class="edge-icon sq">■</span>
+            <input id="eyeSlider" type="range" min="0" max="100" value="0" />
+            <span class="edge-icon rd">●</span>
+          </div>
+          <label class="slider-label">Pupil radius <span id="pupilValue">0%</span></label>
+          <div class="slider-row">
+            <span class="edge-icon sq">■</span>
+            <input id="pupilSlider" type="range" min="0" max="100" value="0" />
+            <span class="edge-icon rd">●</span>
+          </div>
+          <p class="hint">The "eye frame" is the outer square in each corner; the "pupil" is the inner square.</p>
+        </div>
+
+        <div class="panel" data-panel="logo">
+          <div class="logo-upload">
+            <input id="logoInput" type="file" accept="image/*" hidden />
+            <button id="logoUploadBtn" class="btn btn-secondary">Upload logo</button>
+            <button id="logoRemoveBtn" class="btn btn-ghost" hidden>Remove</button>
+          </div>
+          <label class="slider-label">Logo size <span id="logoSizeValue">22%</span></label>
+          <input id="logoSizeSlider" type="range" min="10" max="30" value="22" />
+          <label class="slider-label">Frame shape</label>
+          <div class="shape-options" id="shapeOptions">
+            <button class="shape-btn active" data-shape="square" title="Square">■</button>
+            <button class="shape-btn" data-shape="rounded" title="Rounded square">▢</button>
+            <button class="shape-btn" data-shape="circle" title="Circle">●</button>
+          </div>
+          <p class="hint">A high error-correction level is used automatically so the QR still scans with a logo.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="qrcode-generator.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
