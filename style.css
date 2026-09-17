@@ -90,6 +90,11 @@ body {
   background: #26262f;
 }
 
+.download-group {
+  display: flex;
+  gap: 10px;
+}
+
 .btn-ghost {
   background: transparent;
   color: #ff6b6b;

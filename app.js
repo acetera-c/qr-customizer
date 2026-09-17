@@ -79,73 +79,232 @@ function roundRect(c, x, y, w, h, r) {
   c.closePath();
 }
 
-function drawFinderPattern(c, originX, originY, moduleSize, eyeRadiusPct, pupilRadiusPct) {
-  const outerSize = moduleSize * 7;
-  const ringSize = moduleSize * 5;
-  const pupilSize = moduleSize * 3;
+// Builds a renderer-agnostic list of primitives describing the QR code, so
+// the canvas preview and the SVG export are always generated from identical
+// geometry rather than two separate drawing implementations.
+function buildShapes() {
+  const matrix = buildMatrix(state.text, !!state.logoImage);
+  const count = matrix.length;
+  const moduleSize = CANVAS_SIZE / (count + QUIET_ZONE_MODULES * 2);
+  const offset = moduleSize * QUIET_ZONE_MODULES;
+  const shapes = [];
 
-  c.fillStyle = state.fgColor;
-  roundRect(c, originX, originY, outerSize, outerSize, (outerSize / 2) * eyeRadiusPct);
-  c.fill();
+  shapes.push({
+    type: "rect",
+    x: 0,
+    y: 0,
+    w: CANVAS_SIZE,
+    h: CANVAS_SIZE,
+    r: 0,
+    fill: state.bgColor,
+  });
 
-  c.fillStyle = state.bgColor;
-  roundRect(
-    c,
-    originX + moduleSize,
-    originY + moduleSize,
-    ringSize,
-    ringSize,
-    (ringSize / 2) * eyeRadiusPct
-  );
-  c.fill();
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (!matrix[row][col]) continue;
+      if (isInFinderZone(row, col, count)) continue;
+      shapes.push({
+        type: "rect",
+        x: offset + col * moduleSize,
+        y: offset + row * moduleSize,
+        w: moduleSize,
+        h: moduleSize,
+        r: (moduleSize / 2) * state.pixelRadius,
+        fill: state.fgColor,
+      });
+    }
+  }
 
-  c.fillStyle = state.fgColor;
-  roundRect(
-    c,
-    originX + moduleSize * 2,
-    originY + moduleSize * 2,
-    pupilSize,
-    pupilSize,
-    (pupilSize / 2) * pupilRadiusPct
-  );
-  c.fill();
+  const finderOrigins = [
+    [0, 0],
+    [0, count - 7],
+    [count - 7, 0],
+  ];
+  finderOrigins.forEach(([row, col]) => {
+    const originX = offset + col * moduleSize;
+    const originY = offset + row * moduleSize;
+    const outerSize = moduleSize * 7;
+    const ringSize = moduleSize * 5;
+    const pupilSize = moduleSize * 3;
+
+    shapes.push({
+      type: "rect",
+      x: originX,
+      y: originY,
+      w: outerSize,
+      h: outerSize,
+      r: (outerSize / 2) * state.eyeRadius,
+      fill: state.fgColor,
+    });
+    shapes.push({
+      type: "rect",
+      x: originX + moduleSize,
+      y: originY + moduleSize,
+      w: ringSize,
+      h: ringSize,
+      r: (ringSize / 2) * state.eyeRadius,
+      fill: state.bgColor,
+    });
+    shapes.push({
+      type: "rect",
+      x: originX + moduleSize * 2,
+      y: originY + moduleSize * 2,
+      w: pupilSize,
+      h: pupilSize,
+      r: (pupilSize / 2) * state.pupilRadius,
+      fill: state.fgColor,
+    });
+  });
+
+  if (state.logoImage) {
+    const size = count * moduleSize * (state.logoSizePct / 100);
+    const centerX = CANVAS_SIZE / 2;
+    const centerY = CANVAS_SIZE / 2;
+    const boxSize = size + size * 0.16 * 2;
+
+    if (state.logoShape === "circle") {
+      shapes.push({
+        type: "circle",
+        cx: centerX,
+        cy: centerY,
+        radius: boxSize / 2,
+        fill: state.bgColor,
+      });
+    } else {
+      shapes.push({
+        type: "rect",
+        x: centerX - boxSize / 2,
+        y: centerY - boxSize / 2,
+        w: boxSize,
+        h: boxSize,
+        r: state.logoShape === "rounded" ? boxSize * 0.28 : boxSize * 0.06,
+        fill: state.bgColor,
+      });
+    }
+
+    shapes.push({
+      type: "image",
+      x: centerX - size / 2,
+      y: centerY - size / 2,
+      w: size,
+      h: size,
+      href: state.logoImage.src,
+      clipShape: state.logoShape,
+      clipRadius: state.logoShape === "rounded" ? size * 0.24 : size * 0.04,
+    });
+  }
+
+  return shapes;
 }
 
-function drawLogo(c, centerX, centerY, size) {
-  if (!state.logoImage) return;
+function drawShapesToCanvas(shapes) {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  const padding = size * 0.16;
-  const boxSize = size + padding * 2;
-  const boxX = centerX - boxSize / 2;
-  const boxY = centerY - boxSize / 2;
+  shapes.forEach((shape) => {
+    if (shape.type === "rect") {
+      ctx.fillStyle = shape.fill;
+      roundRect(ctx, shape.x, shape.y, shape.w, shape.h, shape.r);
+      ctx.fill();
+      return;
+    }
 
-  c.save();
-  c.fillStyle = state.bgColor;
-  if (state.logoShape === "circle") {
-    c.beginPath();
-    c.arc(centerX, centerY, boxSize / 2, 0, Math.PI * 2);
-    c.fill();
-  } else {
-    const r = state.logoShape === "rounded" ? boxSize * 0.28 : boxSize * 0.06;
-    roundRect(c, boxX, boxY, boxSize, boxSize, r);
-    c.fill();
-  }
-  c.restore();
+    if (shape.type === "circle") {
+      ctx.fillStyle = shape.fill;
+      ctx.beginPath();
+      ctx.arc(shape.cx, shape.cy, shape.radius, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
 
-  c.save();
-  const imgX = centerX - size / 2;
-  const imgY = centerY - size / 2;
-  if (state.logoShape === "circle") {
-    c.beginPath();
-    c.arc(centerX, centerY, size / 2, 0, Math.PI * 2);
-    c.clip();
-  } else {
-    const r = state.logoShape === "rounded" ? size * 0.24 : size * 0.04;
-    roundRect(c, imgX, imgY, size, size, r);
-    c.clip();
-  }
-  c.drawImage(state.logoImage, imgX, imgY, size, size);
-  c.restore();
+    if (shape.type === "image" && state.logoImage) {
+      ctx.save();
+      if (shape.clipShape === "circle") {
+        ctx.beginPath();
+        ctx.arc(shape.x + shape.w / 2, shape.y + shape.h / 2, shape.w / 2, 0, Math.PI * 2);
+        ctx.clip();
+      } else {
+        roundRect(ctx, shape.x, shape.y, shape.w, shape.h, shape.clipRadius);
+        ctx.clip();
+      }
+      ctx.drawImage(state.logoImage, shape.x, shape.y, shape.w, shape.h);
+      ctx.restore();
+    }
+  });
+}
+
+function num(value) {
+  return Math.round(value * 1000) / 1000;
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildSvgString(shapes) {
+  const defs = [];
+  const body = [];
+  let clipCounter = 0;
+
+  shapes.forEach((shape) => {
+    if (shape.type === "rect") {
+      const rx = shape.r > 0 ? ` rx="${num(Math.min(shape.r, shape.w / 2, shape.h / 2))}"` : "";
+      body.push(
+        `<rect x="${num(shape.x)}" y="${num(shape.y)}" width="${num(shape.w)}" ` +
+          `height="${num(shape.h)}"${rx} fill="${escapeXml(shape.fill)}"/>`
+      );
+      return;
+    }
+
+    if (shape.type === "circle") {
+      body.push(
+        `<circle cx="${num(shape.cx)}" cy="${num(shape.cy)}" ` +
+          `r="${num(shape.radius)}" fill="${escapeXml(shape.fill)}"/>`
+      );
+      return;
+    }
+
+    if (shape.type === "image") {
+      const clipId = `logo-clip-${clipCounter++}`;
+      if (shape.clipShape === "circle") {
+        defs.push(
+          `<clipPath id="${clipId}"><circle cx="${num(shape.x + shape.w / 2)}" ` +
+            `cy="${num(shape.y + shape.h / 2)}" r="${num(shape.w / 2)}"/></clipPath>`
+        );
+      } else {
+        defs.push(
+          `<clipPath id="${clipId}"><rect x="${num(shape.x)}" y="${num(shape.y)}" ` +
+            `width="${num(shape.w)}" height="${num(shape.h)}" ` +
+            `rx="${num(shape.clipRadius)}"/></clipPath>`
+        );
+      }
+      // preserveAspectRatio="none" matches how canvas drawImage stretches the
+      // logo to fill the box, keeping the SVG identical to the preview.
+      // Both xlink:href and href are emitted: Illustrator and other SVG 1.1
+      // consumers only read xlink:href, and without it they treat the logo as
+      // a broken external link and drop it.
+      body.push(
+        `<image x="${num(shape.x)}" y="${num(shape.y)}" width="${num(shape.w)}" ` +
+          `height="${num(shape.h)}" preserveAspectRatio="none" ` +
+          `clip-path="url(#${clipId})" ` +
+          `xlink:href="${escapeXml(shape.href)}" href="${escapeXml(shape.href)}"/>`
+      );
+    }
+  });
+
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" ` +
+    `xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" ` +
+    `width="${CANVAS_SIZE}" ` +
+    `height="${CANVAS_SIZE}" viewBox="0 0 ${CANVAS_SIZE} ${CANVAS_SIZE}">` +
+    (defs.length ? `<defs>${defs.join("")}</defs>` : "") +
+    body.join("") +
+    `</svg>`
+  );
 }
 
 function render() {
@@ -159,50 +318,7 @@ function render() {
 }
 
 function renderUnsafe() {
-  const useHighEC = !!state.logoImage;
-  const matrix = buildMatrix(state.text, useHighEC);
-  const count = matrix.length;
-  const moduleSize = CANVAS_SIZE / (count + QUIET_ZONE_MODULES * 2);
-  const offset = moduleSize * QUIET_ZONE_MODULES;
-
-  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  ctx.fillStyle = state.bgColor;
-  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-  ctx.fillStyle = state.fgColor;
-  for (let r = 0; r < count; r++) {
-    for (let c2 = 0; c2 < count; c2++) {
-      if (!matrix[r][c2]) continue;
-      if (isInFinderZone(r, c2, count)) continue;
-      const x = offset + c2 * moduleSize;
-      const y = offset + r * moduleSize;
-      const radius = (moduleSize / 2) * state.pixelRadius;
-      roundRect(ctx, x, y, moduleSize, moduleSize, radius);
-      ctx.fill();
-    }
-  }
-
-  const finderOrigins = [
-    [0, 0],
-    [0, count - 7],
-    [count - 7, 0],
-  ];
-  finderOrigins.forEach(([r, c2]) => {
-    drawFinderPattern(
-      ctx,
-      offset + c2 * moduleSize,
-      offset + r * moduleSize,
-      moduleSize,
-      state.eyeRadius,
-      state.pupilRadius
-    );
-  });
-
-  if (state.logoImage) {
-    const qrPixelWidth = count * moduleSize;
-    const logoSize = qrPixelWidth * (state.logoSizePct / 100);
-    drawLogo(ctx, CANVAS_SIZE / 2, CANVAS_SIZE / 2, logoSize);
-  }
+  drawShapesToCanvas(buildShapes());
 }
 
 function hexFromHue(hue) {
@@ -359,11 +475,27 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-document.getElementById("downloadBtn").addEventListener("click", () => {
+document.getElementById("downloadPngBtn").addEventListener("click", () => {
   const link = document.createElement("a");
   link.download = "qr-code.png";
   link.href = canvas.toDataURL("image/png");
   link.click();
+});
+
+document.getElementById("downloadSvgBtn").addEventListener("click", () => {
+  try {
+    const svg = buildSvgString(buildShapes());
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = "qr-code.svg";
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showFatalError("Could not export SVG: " + err.message);
+    console.error(err);
+  }
 });
 
 }
