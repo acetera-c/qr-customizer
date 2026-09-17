@@ -31,7 +31,7 @@ const CANVAS_SIZE = canvas.width; // square canvas
 const QUIET_ZONE_MODULES = 3;
 
 const state = {
-  text: "https://cursor.com",
+  text: "https://www.tesla.com/",
   fgColor: "#000000",
   bgColor: "#ffffff",
   pixelRadius: 0, // 0-1
